@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
-import { ContextEntry, DevCtxConfig } from "./types";
+import { ContextEntry, DevCtxConfig, ModuleState, Signal } from "./types";
 import { getRepoRoot } from "./git";
 import { callAI } from "./ai";
+import { reduceState } from "./state-reducer";
 
 export async function getDevCtxDir(): Promise<string> {
   const root = await getRepoRoot();
@@ -49,7 +50,148 @@ export async function saveContext(entry: ContextEntry): Promise<string> {
   // Update index for fast lookups
   await updateIndex();
 
+  // Phase 2: update module-level state machine snapshots for this save event
+  await updateModuleStatesFromEntry(entry);
+
   return sessionFile;
+}
+
+/**
+ * Load module states for a branch by merging per-user snapshots conservatively.
+ */
+export async function loadBranchModuleStates(branch: string): Promise<ModuleState[]> {
+  const dir = await getDevCtxDir();
+  const safeBranchName = branch.replace(/\//g, "__");
+  const modulesDir = path.join(dir, "modules", safeBranchName);
+
+  if (!fs.existsSync(modulesDir)) return [];
+
+  const userFiles = fs
+    .readdirSync(modulesDir)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => path.join(modulesDir, f));
+
+  const merged = new Map<string, ModuleState>();
+
+  for (const userFile of userFiles) {
+    let states: ModuleState[] = [];
+    try {
+      states = JSON.parse(fs.readFileSync(userFile, "utf-8"));
+    } catch {
+      continue;
+    }
+
+    for (const state of states) {
+      const existing = merged.get(state.module);
+      if (!existing) {
+        merged.set(state.module, state);
+        continue;
+      }
+
+      const existingTime = new Date(existing.lastUpdated).getTime();
+      const incomingTime = new Date(state.lastUpdated).getTime();
+      if (incomingTime >= existingTime) {
+        merged.set(state.module, state);
+      }
+    }
+  }
+
+  return Array.from(merged.values()).sort(
+    (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+  );
+}
+
+/**
+ * Apply reducer signals from a ContextEntry into per-user module snapshots.
+ */
+async function updateModuleStatesFromEntry(entry: ContextEntry): Promise<void> {
+  const dir = await getDevCtxDir();
+  const safeBranchName = entry.branch.replace(/\//g, "__");
+  const safeAuthor = sanitizePathSegment(entry.author || "unknown");
+  const branchModulesDir = path.join(dir, "modules", safeBranchName);
+  const userModulesFile = path.join(branchModulesDir, `${safeAuthor}.json`);
+
+  fs.mkdirSync(branchModulesDir, { recursive: true });
+
+  let states: ModuleState[] = [];
+  if (fs.existsSync(userModulesFile)) {
+    try {
+      states = JSON.parse(fs.readFileSync(userModulesFile, "utf-8"));
+    } catch {
+      states = [];
+    }
+  }
+
+  const stateByModule = new Map<string, ModuleState>();
+  for (const state of states) {
+    stateByModule.set(state.module, state);
+  }
+
+  const touchedFiles = [...new Set([...(entry.filesChanged || []), ...(entry.filesStaged || [])])];
+  if (touchedFiles.length === 0) {
+    return;
+  }
+
+  for (const filePath of touchedFiles) {
+    const module = inferModuleFromPath(filePath);
+    const previous = stateByModule.get(module) || null;
+
+    const signal: Signal = {
+      type: "file_save",
+      timestamp: entry.timestamp,
+      module,
+      filePath,
+      author: entry.author,
+      commitMessage: entry.recentCommits && entry.recentCommits.length > 0 ? entry.recentCommits[0] : undefined,
+      userNote: entry.task,
+    };
+
+    const next = reduceState(signal, previous);
+    next.repo = entry.repo;
+    next.branch = entry.branch;
+
+    // Carry explicit user intent into state while preserving inferred results.
+    if (entry.currentState && entry.currentState.length > 0) {
+      next.currentState = entry.currentState;
+    }
+
+    if (entry.decisions && entry.decisions.length > 0) {
+      next.decisions = [...new Set([...next.decisions, ...entry.decisions])].slice(-8);
+    }
+
+    if (entry.nextSteps && entry.nextSteps.length > 0) {
+      next.nextSteps = [...new Set([...entry.nextSteps, ...next.nextSteps])].slice(0, 5);
+    }
+
+    stateByModule.set(module, next);
+  }
+
+  const nextStates = Array.from(stateByModule.values()).sort(
+    (a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+  );
+
+  fs.writeFileSync(userModulesFile, JSON.stringify(nextStates, null, 2));
+}
+
+function inferModuleFromPath(filePath: string): string {
+  const normalized = filePath.replace(/\\/g, "/").replace(/^\/+/, "");
+  const segments = normalized.split("/").filter(Boolean);
+
+  if (segments.length <= 1) return normalized || "root";
+
+  if (segments[0] === "src" && segments.length >= 3) {
+    return `${segments[0]}/${segments[1]}`;
+  }
+
+  if (segments.length >= 2) {
+    return `${segments[0]}/${segments[1]}`;
+  }
+
+  return segments[0] || "root";
+}
+
+function sanitizePathSegment(input: string): string {
+  return input.replace(/[\\/:*?"<>|]/g, "_");
 }
 
 export async function loadBranchContext(branch: string): Promise<ContextEntry[]> {

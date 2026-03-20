@@ -21,9 +21,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { isInitialized, loadBranchContext, loadAllSessions, saveContext } from "./core/context";
+import { isInitialized, loadBranchContext, loadBranchModuleStates, loadAllSessions, saveContext } from "./core/context";
 import { getCurrentBranch, getRepoName, getChangedFiles, getStagedFiles, getRecentCommits, getAuthor } from "./core/git";
-import { generatePrompt } from "./core/prompt";
+import { generateModulePrompt, generatePrompt } from "./core/prompt";
 import { ContextEntry } from "./core/types";
 import { v4 as uuid } from "uuid";
 
@@ -52,15 +52,20 @@ server.tool(
         }
 
         const targetBranch = branch || (await getCurrentBranch());
-        const entries = await loadBranchContext(targetBranch);
+        const [states, entries] = await Promise.all([
+            loadBranchModuleStates(targetBranch),
+            loadBranchContext(targetBranch),
+        ]);
 
-        if (entries.length === 0) {
+        if (states.length === 0 && entries.length === 0) {
             return {
                 content: [{ type: "text" as const, text: `No context found for branch: ${targetBranch}. Run \`devctx save\` first.` }],
             };
         }
 
-        const prompt = generatePrompt(entries);
+        const prompt = states.length > 0
+            ? generateModulePrompt(states, { branch: targetBranch })
+            : generatePrompt(entries);
         return { content: [{ type: "text" as const, text: prompt }] };
     }
 );
@@ -198,13 +203,18 @@ server.resource(
         }
 
         const branch = await getCurrentBranch();
-        const entries = await loadBranchContext(branch);
+        const [states, entries] = await Promise.all([
+            loadBranchModuleStates(branch),
+            loadBranchContext(branch),
+        ]);
 
-        if (entries.length === 0) {
+        if (states.length === 0 && entries.length === 0) {
             return { contents: [{ uri: uri.href, text: "No context found.", mimeType: "text/plain" }] };
         }
 
-        const prompt = generatePrompt(entries);
+        const prompt = states.length > 0
+            ? generateModulePrompt(states, { branch })
+            : generatePrompt(entries);
         return { contents: [{ uri: uri.href, text: prompt, mimeType: "text/markdown" }] };
     }
 );
