@@ -221,12 +221,14 @@ server.resource(
 
 // --- Start ---
 
-async function main() {
+export async function startMcpServer() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }
 
-main().catch((err) => {
-    console.error("MCP server error:", err);
-    process.exit(1);
-});
+if (require.main === module) {
+    startMcpServer().catch((err) => {
+        console.error("MCP server error:", err);
+        process.exit(1);
+    });
+}

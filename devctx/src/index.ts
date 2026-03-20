@@ -13,6 +13,7 @@ import { summarizeCommand } from "./commands/summarize";
 import { suggestCommand } from "./commands/suggest";
 import { compressCommand } from "./commands/compress";
 import { configCommand } from "./commands/config-cmd";
+import { startMcpServer } from "./mcp-server";
 
 const program = new Command();
 
@@ -102,6 +103,13 @@ program
   .command("config [action] [key] [value]")
   .description("Manage DevContext configuration (list/get/set)")
   .action(configCommand);
+
+program
+  .command("mcp")
+  .description("Start DevContext MCP server over stdio")
+  .action(async () => {
+    await startMcpServer();
+  });
 
 program.parse();
 
