@@ -264,14 +264,16 @@ async function extractFromAntigravity(
         }
     }
 
-    // 2. Parse task.md for MORE SPECIFIC active task
-    //    If we have a specific checklist item that is In Progress or Recently Done, use that as the main task
+    // 2. Parse task.md for active checklist context.
+    // Keep implementation_plan title as primary intent when available.
     const taskContent = fs.existsSync(latest.taskFile) ? fs.readFileSync(latest.taskFile, "utf-8") : "";
     if (taskContent) {
         // Look for in-progress items first (user specific notations like [-] or [/])
         const inProgressMatch = taskContent.match(/-\s+\[[/-]\]\s+(.+)$/m);
         if (inProgressMatch) {
-            task = inProgressMatch[1].trim();
+            if (!task) {
+                task = inProgressMatch[1].trim();
+            }
         } else {
             // Look for last completed item (likely what was just finished)
             const completedMatches = [...taskContent.matchAll(/-\s+\[x\]\s+(.+)$/gm)];
@@ -280,8 +282,10 @@ async function extractFromAntigravity(
                 const lastTwo = completedMatches.slice(-2).map(m => m[1].trim());
                 const combinedTask = lastTwo.join(" + ");
 
-                // Combine with plan title if available for context
-                task = task ? `${combinedTask} (Structure: ${task})` : combinedTask;
+                // Only fall back to checklist-derived task when plan title is unavailable.
+                if (!task) {
+                    task = combinedTask;
+                }
             }
         }
     }
