@@ -1,0 +1,48 @@
+{
+  "name": "devctx-vscode",
+  "displayName": "DevContext",
+  "description": "Persistent AI coding context — auto-resume on workspace open",
+  "version": "0.5.0",
+  "publisher": "sukhad",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "devctx.save",
+        "title": "DevContext: Save Context"
+      },
+      {
+        "command": "devctx.resume",
+        "title": "DevContext: Resume Context"
+      },
+      {
+        "command": "devctx.log",
+        "title": "DevContext: View Log"
+      },
+      {
+        "command": "devctx.diff",
+        "title": "DevContext: Show Diff"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
