@@ -1,0 +1,15 @@
+
+# DevContext - AI coding context
+.devctx/
+
+# Node/TS artifacts
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+
+# VS Code extension packages
+*.vsix
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
