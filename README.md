@@ -1,118 +1,222 @@
-# DevContext 🧠
+# FlowState
 
-> *"Git tracks your code history. DevContext tracks your intent history."*
+✨ Keep your coding context in flow.
 
-**Persistent AI coding context for teams.** Never re-explain your codebase to an AI assistant again.
+FlowState is the product brand. The current CLI command remains `devctx` for backward compatibility.
 
-## The Problem
+FlowState captures what you were doing, why you made decisions, and what to do next, then restores it instantly from CLI or MCP.
 
-You're deep in a Cursor session refactoring a payment service. You've explained the architecture, tried 3 approaches, finally found the right one. Session dies. Next morning — or worse, your teammate picks it up — and the AI has **zero memory**. You spend 15 min re-explaining everything. Every. Single. Time.
+## Why FlowState
 
-This is broken across **every** AI coding tool: Cursor, Claude Code, Copilot, Windsurf — none of them persist context across sessions, editors, or team members.
-
-## The Solution
-
-**DevContext** is a CLI tool that automatically captures and restores AI coding context, scoped to your repo and branch.
-
-```bash
-# Save context after a session
-devctx save "Refactoring payment service to use event sourcing"
-
-# Restore context in any editor, any machine
-devctx resume
-```
+- 🧠 Resume work without re-reading everything.
+- 🔄 Keep context per branch and per user.
+- 🤝 Make handoff and ownership visible for teams.
+- 🔌 Connect directly to AI tools through MCP.
 
 ## Install
 
+Requirements:
+
+- Node.js 18+
+- npm
+
+Install globally:
+
 ```bash
 npm install -g devctx
+devctx --version
 ```
+
+Run from source:
+
+```bash
+npm install
+npm run build
+npm run dev -- --help
+```
+
+## Windows Setup (PowerShell)
+
+Use PowerShell 7+:
+
+```powershell
+$PSVersionTable.PSVersion
+```
+
+If needed:
+
+```powershell
+winget install Microsoft.PowerShell
+```
+
+Validate Node path:
+
+```powershell
+node --version
+npm --version
+where.exe node
+Get-Command node | Select-Object -ExpandProperty Source
+```
+
+Note: `where` in PowerShell is not the same as `where.exe`.
 
 ## Quick Start
 
 ```bash
-# 1. Initialize in your repo
+# In your repository root
+cd your-project
 devctx init
 
-# 2. Work on your code... then save context
-devctx save
-# → Interactive prompts capture: Task, Approaches, Decisions, Next Steps
+# Capture context
+devctx save --smart "switched payment service to TypeORM"
 
-# 3. Resume in ANY editor
-devctx resume
-# → Copies a perfectly formatted prompt to your clipboard
-# → Paste into Cursor, Claude, or ChatGPT to restore full context
+# Resume context
+devctx resume --stdout
 ```
 
-## Features & Commands
+## Commands
 
-### Core (No AI Key Required)
-**These commands work locally with zero dependencies.**
-| Command | Description |
-|---------|-------------|
-| `devctx init` | Initialize DevContext in current repo |
-| `devctx save [msg]` | Save context (interactive or quick mode) |
-| `devctx save --auto` | Auto-save context from agent/editor logs (non-interactive) |
-| `devctx resume` | Generate AI prompt & copy to clipboard |
-| `devctx log` | View context history for current branch |
-| `devctx diff` | Show changes since last context save |
+Core:
 
-### Team & Automation (No AI Key Required)
-| Command | Description |
-|---------|-------------|
-| `devctx handoff @user` | explicit handoff note to a teammate |
-| `devctx share` | Commit `.devctx/` folder to git for team sync |
-| `devctx watch` | Auto-save context on file changes (using `chokidar`) |
-| `devctx hook install` | Install git post-commit hook for auto-capture |
+- `devctx init`
+- `devctx save [message]`
+- `devctx resume`
+- `devctx log`
+- `devctx diff`
 
-### AI-Powered (Experimental)
-### AI-Powered (Experimental)
-**Requires an LLM Provider.** Set via `DEVCTX_AI_KEY` env var or `devctx config set aiApiKey <key>`. Defaults to OpenAI-compatible API.
-| Command | Description |
-|---------|-------------|
-| `devctx summarize` | AI-generates context from git diff + recent commits |
-| `devctx suggest` | AI suggests next steps based on current context |
-| `devctx compress` | detailed history into a concise summary |
+Team/workflow:
 
-### Configuration
-| Command | Description |
-|---------|-------------|
-| `devctx config set <key> <val>` | Set preferences (e.g. `aiProvider`, `watchInterval`) |
-| `devctx config list` | View all configuration |
+- `devctx handoff [assignee] [message]`
+- `devctx share`
+- `devctx watch`
+- `devctx hook <action>`
+- `devctx timeline`
+- `devctx ownership`
+- `devctx recap`
+- `devctx diff-thinking`
 
-## Integrations
+AI-assisted:
 
-### 🤖 MCP Server (Claude Code, Windsurf)
-DevContext provides a Model Context Protocol (MCP) server to allow AI agents to natively read/write context.
+- `devctx summarize`
+- `devctx suggest`
+- `devctx compress`
 
-**Add to your MCP config:**
+Config/integration:
+
+- `devctx config [action] [key] [value]`
+- `devctx mcp`
+
+Common examples:
+
+```bash
+devctx save "fixed schema mismatch"
+devctx save --smart "payment module work"
+devctx resume --stdout
+devctx timeline --count 5
+devctx ownership --top 3
+devctx recap --hours 24
+devctx diff-thinking --count 10
+```
+
+## MCP Integration
+
+Start MCP server:
+
+```bash
+devctx mcp --root /absolute/path/to/project
+# or
+node dist/mcp.js --root /absolute/path/to/project
+```
+
+MCP tools (stable names):
+
+- `devctx_save`
+- `devctx_resume`
+- `devctx_log`
+- `devctx_timeline`
+- `devctx_ownership`
+- `devctx_recap`
+- `devctx_diff_thinking`
+
+MCP resource:
+
+- `devctx://context`
+
+All branch-scoped MCP tools accept `root` and derive branch from that root repository context.
+
+## VS Code MCP Config (Windows)
+
+File:
+
+- `%APPDATA%\\Code\\User\\settings.json`
+
+Add:
+
 ```json
 {
-  "mcpServers": {
+  "mcp.servers": {
     "devctx": {
-      "command": "npx",
-      "args": ["-y", "devctx", "mcp"]
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\ujjwa\\OneDrive\\Desktop\\Hack\\devctx\\devctx\\dist\\mcp.js"
+      ],
+      "env": {
+        "DEVCTX_ROOT": "C:\\Users\\ujjwa\\OneDrive\\Desktop\\Hack\\devctx"
+      }
     }
   }
 }
 ```
-*Exposes tools: `devctx_save`, `devctx_resume`, `devctx_log` and resource `devctx://context`.*
 
-### 🆚 VS Code Extension
-Auto-resumes context when you open the project.
-### 💻 Direct CLI Usage
-Any AI agent with terminal access (e.g. via `run_command` or similar tools) can directly run `devctx save`, `resume`, and `log`. This is a universal fallback if MCP is not available.
+Then restart VS Code and run a tool call such as `devctx_resume` from your AI client.
 
-## How It Works
+## Storage
 
-DevContext stores a `.devctx/` folder in your repo. Each entry captures:
-- **Task**: What you are doing
-- **Goal**: Why you are doing it
-- **Approaches**: What you tried (and what failed)
-- **Decisions**: Key architectural choices
-- **State**: Where you left off
+FlowState stores context under `.devctx/` in your repository.
 
-It works with **every** AI coding tool because it simply manages the *prompt* — the universal interface for LLMs.
+Key paths:
 
-## License
-MIT
+- `.devctx/index.json`
+- `.devctx/sessions/`
+- `.devctx/branches/{branch}/{user}/context.json`
+- `.devctx/modules/{branch}/{user}.json`
+
+Branch names with `/` are path-safe in storage (for example, `feature/payments` becomes `feature__payments`).
+
+## Security
+
+- 🔒 Sensitive-looking tokens are redacted before persistence.
+- `DEVCTX_ENCRYPTION_KEY` enables optional encryption flow for module state snapshots.
+- Keep `.devctx/branches/`, `.devctx/modules/`, `.devctx/snapshots/` in `.gitignore` for private memory.
+
+## Troubleshooting
+
+Command not found:
+
+```bash
+npm link
+```
+
+Build MCP entrypoint:
+
+```bash
+npm run build
+node dist/mcp.js --help
+```
+
+MCP tools not appearing:
+
+1. Use absolute `node.exe` path.
+2. Use absolute `dist/mcp.js` path.
+3. Set `DEVCTX_ROOT` in MCP `env`.
+4. Restart the client.
+
+Wrong context via MCP:
+
+- Pass `root` explicitly in tool-call arguments or set `DEVCTX_ROOT` in MCP config.
+
+No context found:
+
+1. Run `devctx init` in target repo.
+2. Run at least one `devctx save`.
+3. Run `devctx resume --stdout`.
